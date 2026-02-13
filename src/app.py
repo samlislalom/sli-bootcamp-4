@@ -5,7 +5,13 @@ A FastAPI application that enables Slalom consultants to register their
 capabilities and manage consulting expertise across the organization.
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Request, Response, status
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.middleware.cors import CORSMiddleware
+import bcrypt
+import json
+import secrets
+from typing import Optional
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 import os
@@ -13,6 +19,60 @@ from pathlib import Path
 
 app = FastAPI(title="Slalom Capabilities Management API",
               description="API for managing consulting capabilities and consultant expertise")
+
+# Enable CORS for frontend auth
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+security = HTTPBasic()
+
+# Load practice leads
+practice_leads_path = os.path.join(current_dir, "practice_leads.json")
+with open(practice_leads_path, "r") as f:
+    practice_leads = json.load(f)
+
+# Simple session store (in-memory)
+sessions = {}
+
+def get_current_user(request: Request) -> Optional[dict]:
+    session_token = request.cookies.get("session_token")
+    if session_token and session_token in sessions:
+        return sessions[session_token]
+    return None
+
+def require_practice_lead(request: Request):
+    user = get_current_user(request)
+    if not user or user.get("role") != "practice_lead":
+        raise HTTPException(status_code=401, detail="Practice lead authentication required.")
+    return user
+# In-memory capabilities database
+@app.post("/login")
+async def login(credentials: HTTPBasicCredentials = Depends(security), response: Response = None):
+    username = credentials.username
+    password = credentials.password
+    for lead in practice_leads:
+        if lead["username"] == username:
+            if bcrypt.checkpw(password.encode(), lead["password_hash"].encode()):
+                token = secrets.token_urlsafe(32)
+                sessions[token] = lead
+                response.set_cookie(key="session_token", value=token, httponly=True)
+                return {"message": "Login successful", "role": lead["role"], "practice_area": lead["practice_area"]}
+            else:
+                break
+    raise HTTPException(status_code=401, detail="Invalid username or password.")
+
+@app.post("/logout")
+async def logout(request: Request, response: Response):
+    session_token = request.cookies.get("session_token")
+    if session_token in sessions:
+        del sessions[session_token]
+    response.delete_cookie("session_token")
+    return {"message": "Logged out"}
 
 # Mount the static files directory
 current_dir = Path(__file__).parent
@@ -116,44 +176,26 @@ def get_capabilities():
 
 
 @app.post("/capabilities/{capability_name}/register")
-def register_for_capability(capability_name: str, email: str):
-    """Register a consultant for a capability"""
-    # Validate capability exists
+def register_for_capability(capability_name: str, email: str, request: Request):
+    """Register a consultant for a capability (practice lead only)"""
+    require_practice_lead(request)
     if capability_name not in capabilities:
         raise HTTPException(status_code=404, detail="Capability not found")
-
-    # Get the specific capability
     capability = capabilities[capability_name]
-
-    # Validate consultant is not already registered
     if email in capability["consultants"]:
-        raise HTTPException(
-            status_code=400,
-            detail="Consultant is already registered for this capability"
-        )
-
-    # Add consultant
+        raise HTTPException(status_code=400, detail="Consultant is already registered for this capability")
     capability["consultants"].append(email)
     return {"message": f"Registered {email} for {capability_name}"}
 
 
 @app.delete("/capabilities/{capability_name}/unregister")
-def unregister_from_capability(capability_name: str, email: str):
-    """Unregister a consultant from a capability"""
-    # Validate capability exists
+def unregister_from_capability(capability_name: str, email: str, request: Request):
+    """Unregister a consultant from a capability (practice lead only)"""
+    require_practice_lead(request)
     if capability_name not in capabilities:
         raise HTTPException(status_code=404, detail="Capability not found")
-
-    # Get the specific capability
     capability = capabilities[capability_name]
-
-    # Validate consultant is registered
     if email not in capability["consultants"]:
-        raise HTTPException(
-            status_code=400,
-            detail="Consultant is not registered for this capability"
-        )
-
-    # Remove consultant
+        raise HTTPException(status_code=400, detail="Consultant is not registered for this capability")
     capability["consultants"].remove(email)
     return {"message": f"Unregistered {email} from {capability_name}"}
