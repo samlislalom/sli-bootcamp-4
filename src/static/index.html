@@ -14,6 +14,9 @@
           <h1>Slalom Capabilities Management</h1>
           <h2>Consulting Expertise Platform</h2>
         </div>
+        <div class="auth-icon" id="auth-icon" title="Login">
+          <span>🔒</span>
+        </div>
       </div>
     </header>
 
@@ -28,7 +31,7 @@
 
       <section id="register-container">
         <h3>Register Your Expertise</h3>
-        <form id="register-form">
+        <form id="register-form" class="hidden">
           <div class="form-group">
             <label for="email">Consultant Email:</label>
             <input type="email" id="email" required placeholder="your-email@slalom.com" />
@@ -44,6 +47,26 @@
         </form>
         <div id="message" class="hidden"></div>
       </section>
+
+      <!-- Login Modal -->
+      <div id="login-modal" class="modal hidden">
+        <div class="modal-content">
+          <span class="close" id="close-login">&times;</span>
+          <h3>Practice Lead Login</h3>
+          <form id="login-form">
+            <div class="form-group">
+              <label for="login-username">Username:</label>
+              <input type="text" id="login-username" required />
+            </div>
+            <div class="form-group">
+              <label for="login-password">Password:</label>
+              <input type="password" id="login-password" required />
+            </div>
+            <button type="submit">Login</button>
+          </form>
+          <div id="login-message" class="hidden"></div>
+        </div>
+      </div>
     </main>
 
     <footer>

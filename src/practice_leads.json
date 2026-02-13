@@ -1,0 +1,14 @@
+[
+  {
+    "username": "lead1",
+    "password_hash": "$2b$12$examplehashforlead1",
+    "role": "practice_lead",
+    "practice_area": "Technology"
+  },
+  {
+    "username": "lead2",
+    "password_hash": "$2b$12$examplehashforlead2",
+    "role": "practice_lead",
+    "practice_area": "Operations"
+  }
+]
